@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Music Wave Vision Under Thunder</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <canvas id="scene" aria-label="Music-driven cloudy skyline visualization"></canvas>
+
+      <section class="controls" aria-label="Music visualization controls">
+        <div class="brand">
+          <span class="kicker">Audio Skyline</span>
+          <h1>Music Wave Visualization With Skyline</h1>
+        </div>
+
+        <label class="file-picker icon-control" aria-label="Choose audio" title="Choose audio">
+          <input id="audioFile" type="file" accept="audio/*" />
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 18V5l11-2v13" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="17" cy="16" r="3" />
+          </svg>
+          <span class="sr-only">Choose Audio</span>
+        </label>
+
+        <label class="file-picker icon-control" aria-label="Choose city image" title="Choose city image">
+          <input id="cityImage" type="file" accept="image/*" />
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <circle cx="8" cy="10" r="2" />
+            <path d="m4 17 5-5 4 4 2-2 5 5" />
+          </svg>
+          <span class="sr-only">Choose City Image</span>
+        </label>
+
+        <button id="playPause" class="icon-control" type="button" disabled aria-label="Play" title="Play">
+          <svg class="icon play-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <svg class="icon pause-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 5h4v14H7z" />
+            <path d="M13 5h4v14h-4z" />
+          </svg>
+          <span class="sr-only">Play</span>
+        </button>
+
+        <label class="control">
+          <span>Lightning Brightness</span>
+          <input id="lightningBoost" type="range" min="0.4" max="2.2" value="1.2" step="0.05" />
+        </label>
+
+        <label class="control">
+          <span>Base Background Brightness</span>
+          <input id="backgroundBrightness" type="range" min="0.15" max="0.75" value="0.75" step="0.01" />
+        </label>
+
+        <label class="control">
+          <span>Cloud Visibility</span>
+          <input id="cloudVisibility" type="range" min="0" max="1" value="0.25" step="0.01" />
+        </label>
+
+        <fieldset class="control">
+          <legend>Lightning Rhythm</legend>
+          <label><input type="radio" name="lightningBand" value="treble" checked /> Treble</label>
+          <label><input type="radio" name="lightningBand" value="mid" /> Mid</label>
+          <label><input type="radio" name="lightningBand" value="bass" /> Bass</label>
+        </fieldset>
+
+        <div class="meters" aria-hidden="true">
+          <span style="--level: 0" id="bassMeter">Bass</span>
+          <span style="--level: 0" id="midMeter">Mid</span>
+          <span style="--level: 0" id="trebleMeter">Treble</span>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
