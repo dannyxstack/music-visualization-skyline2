@@ -47,27 +47,63 @@
           <span class="sr-only">Play</span>
         </button>
 
-        <label class="control">
-          <span>Lightning Brightness</span>
-          <input id="lightningBoost" type="range" min="0.4" max="2.2" value="1.2" step="0.05" />
-        </label>
+        <button
+          id="advancedToggle"
+          class="icon-control"
+          type="button"
+          aria-expanded="true"
+          aria-controls="advancedControls"
+          aria-label="Collapse settings"
+          title="Collapse settings"
+        >
+          <svg class="icon collapse-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 15 6-6 6 6" />
+          </svg>
+          <span class="sr-only">Collapse settings</span>
+        </button>
 
-        <label class="control">
-          <span>Base Background Brightness</span>
-          <input id="backgroundBrightness" type="range" min="0.15" max="0.75" value="0.75" step="0.01" />
-        </label>
+        <div id="advancedControls" class="advanced-controls">
+          <button id="analysisModeToggle" class="mode-toggle" type="button" aria-pressed="false">
+            Classic
+          </button>
 
-        <label class="control">
-          <span>Cloud Visibility</span>
-          <input id="cloudVisibility" type="range" min="0" max="1" value="0.25" step="0.01" />
-        </label>
+          <label class="control">
+            <span>Lightning Brightness</span>
+            <input id="lightningBoost" type="range" min="0.4" max="2.2" value="1.2" step="0.05" />
+          </label>
 
-        <fieldset class="control">
-          <legend>Lightning Rhythm</legend>
-          <label><input type="radio" name="lightningBand" value="treble" checked /> Treble</label>
-          <label><input type="radio" name="lightningBand" value="mid" /> Mid</label>
-          <label><input type="radio" name="lightningBand" value="bass" /> Bass</label>
-        </fieldset>
+          <label class="control">
+            <span>Lightning Frequency <strong id="lightningFrequencyValue">1x</strong></span>
+            <input id="lightningFrequency" type="range" min="-4" max="4" value="0" step="1" />
+          </label>
+
+          <label class="control">
+            <span>Base Background Brightness</span>
+            <input id="backgroundBrightness" type="range" min="0.15" max="0.75" value="0.75" step="0.01" />
+          </label>
+
+          <label class="control">
+            <span>Cloud Visibility</span>
+            <input id="cloudVisibility" type="range" min="0" max="1" value="0.25" step="0.01" />
+          </label>
+
+          <label class="control vizzy-control">
+            <span>Vizzy Sensitivity</span>
+            <input id="vizzySensitivity" type="range" min="0.7" max="2.6" value="1.35" step="0.05" />
+          </label>
+
+          <label class="control vizzy-control">
+            <span>Vizzy Bands</span>
+            <input id="vizzyBands" type="range" min="24" max="96" value="64" step="8" />
+          </label>
+
+          <fieldset class="control">
+            <legend>Lightning Rhythm</legend>
+            <label><input type="radio" name="lightningBand" value="treble" checked /> Treble</label>
+            <label><input type="radio" name="lightningBand" value="mid" /> Mid</label>
+            <label><input type="radio" name="lightningBand" value="bass" /> Bass</label>
+          </fieldset>
+        </div>
 
         <div class="meters" aria-hidden="true">
           <span style="--level: 0" id="bassMeter">Bass</span>

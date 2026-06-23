@@ -3,9 +3,16 @@ const ctx = canvas.getContext("2d");
 const fileInput = document.querySelector("#audioFile");
 const cityImageInput = document.querySelector("#cityImage");
 const playButton = document.querySelector("#playPause");
+const controlsPanel = document.querySelector(".controls");
+const advancedToggle = document.querySelector("#advancedToggle");
+const analysisModeToggle = document.querySelector("#analysisModeToggle");
 const boostInput = document.querySelector("#lightningBoost");
+const lightningFrequencyInput = document.querySelector("#lightningFrequency");
+const lightningFrequencyValue = document.querySelector("#lightningFrequencyValue");
 const backgroundBrightnessInput = document.querySelector("#backgroundBrightness");
 const cloudVisibilityInput = document.querySelector("#cloudVisibility");
+const vizzySensitivityInput = document.querySelector("#vizzySensitivity");
+const vizzyBandsInput = document.querySelector("#vizzyBands");
 const bandInputs = [...document.querySelectorAll("input[name='lightningBand']")];
 const meterEls = {
   bass: document.querySelector("#bassMeter"),
@@ -28,10 +35,24 @@ let clouds = [];
 let bolts = [];
 let flash = 0;
 let lastTime = performance.now();
+let analysisMode = "classic";
 let smoothed = { bass: 0, mid: 0, treble: 0 };
 let previousBandEnergy = 0;
+let vizzyState = createVizzyState(0);
 
 const skylineImage = new Image();
+
+function createVizzyState(bandCount) {
+  return {
+    bandCount,
+    ranges: [],
+    centers: [],
+    energies: new Float32Array(bandCount),
+    previous: new Float32Array(bandCount),
+    baselines: new Float32Array(bandCount),
+    hits: new Float32Array(bandCount),
+  };
+}
 
 // x,y are the building rectangle's bottom-left coordinates in image-relative units.
 const imageBuildings = [
@@ -81,7 +102,7 @@ function setupAudio() {
   audioContext = new AudioContext();
   analyser = audioContext.createAnalyser();
   analyser.fftSize = 2048;
-  analyser.smoothingTimeConstant = 0.72;
+  analyser.smoothingTimeConstant = isVizzyMode() ? 0.18 : 0.72;
 
   sourceNode = audioContext.createMediaElementSource(audio);
   sourceNode.connect(analyser);
@@ -202,12 +223,150 @@ function getEnergy(startHz, endHz) {
   return count ? sum / count / 255 : 0;
 }
 
+function ensureVizzyState() {
+  const bandCount = getVizzyBandCount();
+
+  if (vizzyState.bandCount === bandCount) return;
+
+  const minHz = 35;
+  const maxHz = 12000;
+  const minLog = Math.log(minHz);
+  const maxLog = Math.log(maxHz);
+  vizzyState = createVizzyState(bandCount);
+
+  for (let i = 0; i < bandCount; i += 1) {
+    const startRatio = i / bandCount;
+    const endRatio = (i + 1) / bandCount;
+    const centerRatio = (i + 0.5) / bandCount;
+    const startHz = Math.exp(minLog + (maxLog - minLog) * startRatio);
+    const endHz = Math.exp(minLog + (maxLog - minLog) * endRatio);
+    const centerHz = Math.exp(minLog + (maxLog - minLog) * centerRatio);
+    vizzyState.ranges.push([startHz, endHz]);
+    vizzyState.centers.push(centerHz);
+  }
+}
+
+function getFrequencySliceEnergy(startHz, endHz) {
+  if (!audioContext || !frequencyData.length) return 0;
+
+  const nyquist = audioContext.sampleRate / 2;
+  const start = clamp(Math.floor((startHz / nyquist) * frequencyData.length), 0, frequencyData.length - 1);
+  const end = clamp(Math.ceil((endHz / nyquist) * frequencyData.length), start, frequencyData.length - 1);
+  let sum = 0;
+  let count = 0;
+
+  for (let i = start; i <= end; i += 1) {
+    sum += Math.pow(frequencyData[i] / 255, 1.18);
+    count += 1;
+  }
+
+  return count ? sum / count : 0;
+}
+
+function summarizeVizzyRange(minHz, maxHz) {
+  let energySum = 0;
+  let hitSum = 0;
+  let count = 0;
+
+  for (let i = 0; i < vizzyState.bandCount; i += 1) {
+    const center = vizzyState.centers[i];
+    if (center < minHz || center > maxHz) continue;
+
+    energySum += vizzyState.energies[i];
+    hitSum += vizzyState.hits[i];
+    count += 1;
+  }
+
+  if (!count) return { energy: 0, hit: 0 };
+
+  return {
+    energy: energySum / count,
+    hit: hitSum / count,
+  };
+}
+
+function analyzeVizzyBands() {
+  ensureVizzyState();
+
+  const sensitivity = getVizzySensitivity();
+  let globalHit = 0;
+
+  for (let i = 0; i < vizzyState.bandCount; i += 1) {
+    const [startHz, endHz] = vizzyState.ranges[i];
+    const centerHz = vizzyState.centers[i];
+    const tilt = Math.pow(centerHz / 1000, -0.08);
+    const current = clamp(getFrequencySliceEnergy(startHz, endHz) * tilt, 0, 1);
+    const flux = Math.max(0, current - vizzyState.previous[i]);
+    const baseline = vizzyState.baselines[i] * 0.965 + flux * 0.035;
+    const threshold = baseline * (1.65 / sensitivity) + 0.0035 / sensitivity;
+    const hit = clamp((flux - threshold) * sensitivity * 18, 0, 1);
+
+    vizzyState.energies[i] = current;
+    vizzyState.previous[i] = current;
+    vizzyState.baselines[i] = baseline;
+    vizzyState.hits[i] = Math.max(hit, vizzyState.hits[i] * 0.74);
+    globalHit = Math.max(globalHit, vizzyState.hits[i]);
+  }
+
+  const bass = summarizeVizzyRange(40, 180);
+  const mid = summarizeVizzyRange(180, 2800);
+  const treble = summarizeVizzyRange(2800, 12000);
+
+  return {
+    bass: clamp(bass.energy * 0.62 + bass.hit * 0.85, 0, 1),
+    mid: clamp(mid.energy * 0.5 + mid.hit * 0.9, 0, 1),
+    treble: clamp(treble.energy * 0.4 + treble.hit, 0, 1),
+    onset: {
+      bass: bass.hit,
+      mid: mid.hit,
+      treble: treble.hit,
+      global: globalHit,
+    },
+  };
+}
+
 function getBaseBrightness() {
   return Number(backgroundBrightnessInput.value);
 }
 
 function getCloudVisibility() {
   return Number(cloudVisibilityInput.value);
+}
+
+function getLightningFrequencyMultiplier() {
+  return Math.pow(2, Number(lightningFrequencyInput.value));
+}
+
+function updateLightningFrequencyLabel() {
+  const multiplier = getLightningFrequencyMultiplier();
+  lightningFrequencyValue.textContent = multiplier >= 1 ? `${multiplier}x` : `1/${1 / multiplier}x`;
+}
+
+function getVizzySensitivity() {
+  return Number(vizzySensitivityInput.value);
+}
+
+function getVizzyBandCount() {
+  return Number(vizzyBandsInput.value);
+}
+
+function isVizzyMode() {
+  return analysisMode === "vizzy";
+}
+
+function setAnalysisMode(mode) {
+  analysisMode = mode;
+  const enabled = isVizzyMode();
+  analysisModeToggle.textContent = enabled ? "Vizzy-like" : "Classic";
+  analysisModeToggle.classList.toggle("is-vizzy", enabled);
+  analysisModeToggle.setAttribute("aria-pressed", String(enabled));
+  controlsPanel.classList.toggle("is-vizzy", enabled);
+
+  if (analyser) {
+    analyser.smoothingTimeConstant = enabled ? 0.18 : 0.72;
+  }
+
+  previousBandEnergy = 0;
 }
 
 function setPlayButtonState(playing) {
@@ -217,24 +376,37 @@ function setPlayButtonState(playing) {
   playButton.title = label;
 }
 
+function setAdvancedCollapsed(collapsed) {
+  controlsPanel.classList.toggle("is-collapsed", collapsed);
+  advancedToggle.setAttribute("aria-expanded", String(!collapsed));
+  advancedToggle.setAttribute("aria-label", collapsed ? "Expand settings" : "Collapse settings");
+  advancedToggle.title = collapsed ? "Expand settings" : "Collapse settings";
+}
+
 function analyzeAudio() {
-  if (!analyser) return { bass: 0, mid: 0, treble: 0 };
+  if (!analyser) return { bass: 0, mid: 0, treble: 0, onset: { bass: 0, mid: 0, treble: 0, global: 0 } };
 
   analyser.getByteFrequencyData(frequencyData);
   analyser.getByteTimeDomainData(timeData);
 
-  const raw = {
+  const classic = {
     bass: getEnergy(35, 250),
     mid: getEnergy(250, 2600),
     treble: getEnergy(2600, 12000),
   };
+  const raw = isVizzyMode() ? analyzeVizzyBands() : classic;
+  const smoothing = isVizzyMode() ? 0.46 : 0.78;
+  const incoming = 1 - smoothing;
 
-  for (const band of Object.keys(raw)) {
-    smoothed[band] = smoothed[band] * 0.78 + raw[band] * 0.22;
+  for (const band of ["bass", "mid", "treble"]) {
+    smoothed[band] = smoothed[band] * smoothing + raw[band] * incoming;
     meterEls[band].style.setProperty("--level", smoothed[band].toFixed(3));
   }
 
-  return smoothed;
+  return {
+    ...smoothed,
+    onset: raw.onset || { bass: 0, mid: 0, treble: 0, global: 0 },
+  };
 }
 
 function drawBackground(energy) {
@@ -447,6 +619,22 @@ function getTowerEnergy(index, total = buildings.length) {
   if (!frequencyData.length || total <= 0) return 0;
 
   const safeIndex = clamp(Math.round(toFiniteNumber(index, 0)), 0, total - 1);
+
+  if (isVizzyMode() && vizzyState.bandCount > 0) {
+    const bandsPerTower = Math.max(1, Math.ceil(vizzyState.bandCount / total));
+    const start = clamp(Math.floor((safeIndex / total) * vizzyState.bandCount), 0, vizzyState.bandCount - 1);
+    const end = Math.min(vizzyState.bandCount - 1, start + bandsPerTower - 1);
+    let sum = 0;
+    let count = 0;
+
+    for (let i = start; i <= end; i += 1) {
+      sum += vizzyState.energies[i] * 0.45 + vizzyState.hits[i] * 0.95;
+      count += 1;
+    }
+
+    return count ? clamp(sum / count, 0, 1) : 0;
+  }
+
   const usableBins = Math.max(1, Math.floor(frequencyData.length * 0.85));
   const span = Math.max(2, Math.ceil(usableBins / total));
   const start = Math.min(usableBins - 1, Math.floor((safeIndex / total) * usableBins));
@@ -495,10 +683,23 @@ function drawWindows(building, topY, height, towerEnergy, energy) {
 }
 
 function maybeCreateLightning(energy) {
-  const chosen = energy[lightningBand];
+  const frequencyMultiplier = getLightningFrequencyMultiplier();
+  const onset = energy.onset?.[lightningBand] || 0;
+  const chosen = isVizzyMode() ? clamp(onset * 0.9 + energy[lightningBand] * 0.18, 0, 1) : energy[lightningBand];
   const jump = chosen - previousBandEnergy;
-  const threshold = lightningBand === "bass" ? 0.1 : lightningBand === "mid" ? 0.085 : 0.065;
-  const chance = Math.min(0.55, chosen * 0.35);
+  const baseThreshold = isVizzyMode()
+    ? lightningBand === "bass"
+      ? 0.055
+      : lightningBand === "mid"
+        ? 0.048
+        : 0.04
+    : lightningBand === "bass"
+      ? 0.1
+      : lightningBand === "mid"
+        ? 0.085
+        : 0.065;
+  const threshold = baseThreshold / Math.sqrt(frequencyMultiplier);
+  const chance = Math.min(0.9, chosen * (isVizzyMode() ? 0.42 : 0.35) * frequencyMultiplier);
 
   if ((jump > threshold || Math.random() < chance * 0.018) && bolts.length < 4) {
     bolts.push(makeBolt(chosen));
@@ -651,6 +852,7 @@ fileInput.addEventListener("change", () => {
   playButton.disabled = false;
   setPlayButtonState(false);
   isPlaying = false;
+  requestAnimationFrame(() => playButton.focus());
 });
 
 cityImageInput.addEventListener("change", () => {
@@ -662,6 +864,20 @@ cityImageInput.addEventListener("change", () => {
 
 playButton.addEventListener("click", () => {
   togglePlayback();
+});
+
+advancedToggle.addEventListener("click", () => {
+  setAdvancedCollapsed(!controlsPanel.classList.contains("is-collapsed"));
+});
+
+analysisModeToggle.addEventListener("click", () => {
+  setAnalysisMode(isVizzyMode() ? "classic" : "vizzy");
+});
+
+lightningFrequencyInput.addEventListener("input", updateLightningFrequencyLabel);
+
+vizzyBandsInput.addEventListener("input", () => {
+  vizzyState = createVizzyState(0);
 });
 
 window.addEventListener("keydown", (event) => {
@@ -684,5 +900,8 @@ for (const input of bandInputs) {
 }
 
 window.addEventListener("resize", resize);
+updateLightningFrequencyLabel();
+setAnalysisMode("classic");
+setAdvancedCollapsed(false);
 resize();
 requestAnimationFrame(frame);
