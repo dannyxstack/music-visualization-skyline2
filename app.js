@@ -6,6 +6,8 @@ const playButton = document.querySelector("#playPause");
 const controlsPanel = document.querySelector(".controls");
 const advancedToggle = document.querySelector("#advancedToggle");
 const analysisModeToggle = document.querySelector("#analysisModeToggle");
+const detectBeatButton = document.querySelector("#detectBeat");
+const beatRows = [...document.querySelectorAll("[data-beat-track]")];
 const boostInput = document.querySelector("#lightningBoost");
 const lightningFrequencyInput = document.querySelector("#lightningFrequency");
 const lightningFrequencyValue = document.querySelector("#lightningFrequencyValue");
@@ -13,6 +15,9 @@ const backgroundBrightnessInput = document.querySelector("#backgroundBrightness"
 const cloudVisibilityInput = document.querySelector("#cloudVisibility");
 const vizzySensitivityInput = document.querySelector("#vizzySensitivity");
 const vizzyBandsInput = document.querySelector("#vizzyBands");
+const skyTitleEnabledInput = document.querySelector("#skyTitleEnabled");
+const skyTitleTextInput = document.querySelector("#skyTitleText");
+const skyTitleBeatTrackInput = document.querySelector("#skyTitleBeatTrack");
 const bandInputs = [...document.querySelectorAll("input[name='lightningBand']")];
 const meterEls = {
   bass: document.querySelector("#bassMeter"),
@@ -39,8 +44,63 @@ let analysisMode = "classic";
 let smoothed = { bass: 0, mid: 0, treble: 0 };
 let previousBandEnergy = 0;
 let vizzyState = createVizzyState(0);
+let selectedAudioFile = null;
+let beatTracks = {};
+let skyTitleHueOffset = 0;
 
 const skylineImage = new Image();
+const skyTitlePatternCanvas = document.createElement("canvas");
+const skyTitlePatternCtx = skyTitlePatternCanvas.getContext("2d");
+skyTitlePatternCanvas.width = 720;
+skyTitlePatternCanvas.height = 4;
+
+const beatTrackDefinitions = [
+  {
+    id: "main",
+    label: "Main",
+    filters: [
+      { type: "lowpass", frequency: 180, q: 0.85, weight: 0.68 },
+      { type: "bandpass", frequency: 1200, q: 1.2, weight: 0.32 },
+    ],
+  },
+  {
+    id: "kick",
+    label: "Kick",
+    filters: [
+      { type: "lowpass", frequency: 140, q: 0.9, weight: 1 },
+    ],
+  },
+  {
+    id: "backbeat",
+    label: "Backbeat",
+    filters: [
+      { type: "bandpass", frequency: 650, q: 1.1, weight: 0.55 },
+      { type: "bandpass", frequency: 2200, q: 1.35, weight: 0.45 },
+    ],
+  },
+  {
+    id: "hats",
+    label: "Hats",
+    filters: [
+      { type: "highpass", frequency: 3600, q: 0.75, weight: 1 },
+    ],
+  },
+];
+
+beatTracks = Object.fromEntries(beatTrackDefinitions.map((definition) => {
+  const row = beatRows.find((candidate) => candidate.dataset.beatTrack === definition.id);
+
+  return [definition.id, {
+    ...definition,
+    buildingInput: row?.querySelector("[data-role='building']"),
+    bpmInput: row?.querySelector("[data-role='bpm']"),
+    offsetInput: row?.querySelector("[data-role='offset']"),
+    statusEl: row?.querySelector("[data-role='status']"),
+    bpm: 0,
+    offset: 0,
+    pulse: 0,
+  }];
+}));
 
 function createVizzyState(bandCount) {
   return {
@@ -56,45 +116,45 @@ function createVizzyState(bandCount) {
 
 // x,y are the building rectangle's bottom-left coordinates in image-relative units.
 const imageBuildings = [
-  { x: 0.04, y: 0.820, width: 0.025, height: 0.23, cols: 5, rows: 10 },
-  { x: 0.057, y: 0.820, width: 0.05, height: 0.23, cols: 5, rows: 10 },
-  { x: 0.105, y: 0.815, width: 0.073, height: 0.161, cols: 6, rows: 18 },
-  { x: 0.175, y: 0.812, width: 0.055, height: 0.13, cols: 4, rows: 16 },
-  { x: 0.221, y: 0.810, width: 0.070, height: 0.10, cols: 3, rows: 16 },
-  { x: 0.292, y: 0.810, width: 0.048, height: 0.10, cols: 4, rows: 10 },
+  { name: "1", x: 0.04, y: 0.820, width: 0.025, height: 0.23, cols: 5, rows: 10 },
+  { name: "2", x: 0.057, y: 0.820, width: 0.05, height: 0.23, cols: 5, rows: 10 },
+  { name: "3", x: 0.105, y: 0.815, width: 0.073, height: 0.161, cols: 6, rows: 18 },
+  { name: "4", x: 0.175, y: 0.812, width: 0.055, height: 0.13, cols: 4, rows: 16 },
+  { name: "5", x: 0.221, y: 0.810, width: 0.070, height: 0.10, cols: 3, rows: 16 },
+  { name: "6", x: 0.292, y: 0.810, width: 0.048, height: 0.10, cols: 4, rows: 10 },
   
   // BHP
-  { x: 0.348, y: 0.818, width: 0.099, height: 0.34, cols: 8, rows: 16 },
-  { x: 0.442, y: 0.72, width: 0.058, height: 0.232, cols: 5, rows: 24 },
-  { x: 0.445, y: 0.833, width: 0.052, height: 0.14, cols: 10, rows: 8 },
+  { name: "7", x: 0.348, y: 0.818, width: 0.099, height: 0.34, cols: 8, rows: 16 },
+  { name: "8", x: 0.442, y: 0.72, width: 0.058, height: 0.232, cols: 5, rows: 24 },
+  { name: "9", x: 0.445, y: 0.833, width: 0.052, height: 0.14, cols: 10, rows: 8 },
   
-  { x: 0.495, y: 0.825, width: 0.037, height: 0.14, cols: 5, rows: 9 },
-  { x: 0.523, y: 0.820, width: 0.052, height: 0.18, cols: 4, rows: 12 },
-  { x: 0.570, y: 0.834, width: 0.029, height: 0.14, cols: 4, rows: 10 },
+  { name: "10", x: 0.495, y: 0.825, width: 0.037, height: 0.14, cols: 5, rows: 9 },
+  { name: "11", x: 0.523, y: 0.820, width: 0.052, height: 0.18, cols: 4, rows: 12 },
+  { name: "12", x: 0.570, y: 0.834, width: 0.029, height: 0.14, cols: 4, rows: 10 },
   
   // small pillars
-  { x: 0.866, y: 0.827, width: 0.020, height: 0.13, cols: 4, rows: 8 },
-  { x: 0.639, y: 0.743, width: 0.004, height: 0.28, cols: 1, rows: 18 },
-  { x: 0.437, y: 0.813, width: 0.006, height: 0.34, cols: 1, rows: 16 },
+  { name: "13", x: 0.866, y: 0.827, width: 0.020, height: 0.13, cols: 4, rows: 8 },
+  { name: "14", x: 0.639, y: 0.743, width: 0.004, height: 0.28, cols: 1, rows: 18 },
+  { name: "15", x: 0.437, y: 0.813, width: 0.006, height: 0.34, cols: 1, rows: 16 },
   
   // right sides
-  { x: 0.597, y: 0.829, width: 0.048, height: 0.33, cols: 8, rows: 20 },
-  { x: 0.632, y: 0.832, width: 0.053, height: 0.13, cols: 5, rows: 6 },
-  { x: 0.639, y: 0.826, width: 0.065, height: 0.17, cols: 6, rows: 18 },
-  { x: 0.711, y: 0.826, width: 0.060, height: 0.22, cols: 5, rows: 20 },
-  { x: 0.779, y: 0.827, width: 0.070, height: 0.23, cols: 6, rows: 15 },
+  { name: "16", x: 0.597, y: 0.829, width: 0.048, height: 0.33, cols: 8, rows: 20 },
+  { name: "17", x: 0.632, y: 0.832, width: 0.053, height: 0.13, cols: 5, rows: 6 },
+  { name: "18", x: 0.639, y: 0.826, width: 0.065, height: 0.17, cols: 6, rows: 18 },
+  { name: "19", x: 0.711, y: 0.826, width: 0.060, height: 0.22, cols: 5, rows: 20 },
+  { name: "20", x: 0.779, y: 0.827, width: 0.070, height: 0.23, cols: 6, rows: 15 },
 
   // no use
-  { x: 0.777, y: 0.827, width: 0.01, height: 0.01, cols: 1, rows: 1 },
-  { x: 0.777, y: 0.827, width: 0.01, height: 0.01, cols: 1, rows: 1 },
-  { x: 0.842, y: 0.831, width: 0.024, height: 0.21, cols: 3, rows: 13 },
+  { name: "21", x: 0.777, y: 0.827, width: 0.01, height: 0.01, cols: 1, rows: 1 },
+  { name: "22", x: 0.777, y: 0.827, width: 0.01, height: 0.01, cols: 1, rows: 1 },
+  { name: "23", x: 0.842, y: 0.831, width: 0.024, height: 0.21, cols: 3, rows: 13 },
 ];
 
 skylineImage.addEventListener("load", () => {
   buildSkyline();
 });
 
-skylineImage.src = "city-skyline.png";
+skylineImage.src = "city-skyline.gpt.png";
 
 function setupAudio() {
   if (audioContext) return;
@@ -134,6 +194,10 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeBuildingName(name) {
+  return String(name ?? "").trim().toLowerCase();
+}
+
 function normalizeImageBuilding(building, index) {
   const x = toFiniteNumber(building.x, Number.NaN);
   const baseY = toFiniteNumber(building.y, Number.NaN);
@@ -146,6 +210,7 @@ function normalizeImageBuilding(building, index) {
 
   return {
     ...building,
+    name: String(building.name ?? index + 1),
     x,
     y: baseY,
     width,
@@ -177,6 +242,7 @@ function buildSkyline() {
     const cols = Math.max(2, Math.floor(width / randomRange(8, 13)));
     const crown = Math.random() > 0.7 ? randomRange(8, 36) : 0;
     buildings.push({
+      name: String(index + 1),
       x,
       y: h - height,
       width,
@@ -325,6 +391,185 @@ function analyzeVizzyBands() {
   };
 }
 
+async function renderFilteredMonoBuffer(audioBuffer, filterType, frequency, q = 1) {
+  const offline = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate);
+  const source = offline.createBufferSource();
+  const filter = offline.createBiquadFilter();
+  const gain = offline.createGain();
+
+  source.buffer = audioBuffer;
+  filter.type = filterType;
+  filter.frequency.value = frequency;
+  filter.Q.value = q;
+  gain.gain.value = 0.9;
+
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(offline.destination);
+  source.start(0);
+
+  return offline.startRendering();
+}
+
+function createEnergyEnvelope(audioBuffer, hopSize) {
+  const samples = audioBuffer.getChannelData(0);
+  const frameSize = hopSize * 2;
+  const frameCount = Math.max(1, Math.floor((samples.length - frameSize) / hopSize));
+  const envelope = new Float32Array(frameCount);
+  let previous = 0;
+
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const start = frame * hopSize;
+    let sum = 0;
+
+    for (let i = 0; i < frameSize; i += 1) {
+      const sample = samples[start + i] || 0;
+      sum += sample * sample;
+    }
+
+    const rms = Math.sqrt(sum / frameSize);
+    envelope[frame] = Math.max(0, rms - previous);
+    previous = rms;
+  }
+
+  return envelope;
+}
+
+function normalizeEnvelope(envelope) {
+  let max = 0;
+
+  for (const value of envelope) {
+    if (value > max) max = value;
+  }
+
+  if (!max) return envelope;
+
+  for (let i = 0; i < envelope.length; i += 1) {
+    envelope[i] /= max;
+  }
+
+  return envelope;
+}
+
+function combineWeightedEnvelopes(weightedEnvelopes) {
+  const length = Math.min(...weightedEnvelopes.map((item) => item.envelope.length));
+  const combined = new Float32Array(length);
+  const totalWeight = weightedEnvelopes.reduce((sum, item) => sum + item.weight, 0) || 1;
+  let baseline = 0;
+
+  for (let i = 0; i < length; i += 1) {
+    let value = 0;
+
+    for (const item of weightedEnvelopes) {
+      value += item.envelope[i] * item.weight;
+    }
+
+    value /= totalWeight;
+    baseline = baseline * 0.985 + value * 0.015;
+    combined[i] = Math.max(0, value - baseline * 0.65);
+  }
+
+  return normalizeEnvelope(combined);
+}
+
+function estimateBpmFromEnvelope(envelope, sampleRate, hopSize) {
+  const fps = sampleRate / hopSize;
+  const minBpm = 70;
+  const maxBpm = 180;
+  const minLag = Math.floor((60 / maxBpm) * fps);
+  const maxLag = Math.ceil((60 / minBpm) * fps);
+  let bestLag = minLag;
+  let bestScore = -Infinity;
+
+  for (let lag = minLag; lag <= maxLag; lag += 1) {
+    let score = 0;
+    let count = 0;
+
+    for (let i = lag; i < envelope.length; i += 1) {
+      score += envelope[i] * envelope[i - lag];
+      count += 1;
+    }
+
+    const normalized = count ? score / count : 0;
+    if (normalized > bestScore) {
+      bestScore = normalized;
+      bestLag = lag;
+    }
+  }
+
+  return 60 / (bestLag / fps);
+}
+
+function findBeatOffset(envelope, sampleRate, hopSize, bpm) {
+  const fps = sampleRate / hopSize;
+  const lag = Math.max(1, Math.round((60 / bpm) * fps));
+  const searchFrames = Math.min(envelope.length, lag * 8);
+  let bestOffsetFrame = 0;
+  let bestScore = -Infinity;
+
+  for (let offset = 0; offset < lag; offset += 1) {
+    let score = 0;
+
+    for (let frame = offset; frame < searchFrames; frame += lag) {
+      score += envelope[frame] || 0;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestOffsetFrame = offset;
+    }
+  }
+
+  return bestOffsetFrame / fps;
+}
+
+async function detectBeatTracksFromFile(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const DecodeContext = window.AudioContext || window.webkitAudioContext;
+  const decodeContext = new DecodeContext();
+  const audioBuffer = await decodeContext.decodeAudioData(arrayBuffer.slice(0));
+  const hopSize = 1024;
+  const envelopeCache = new Map();
+  const results = {};
+
+  async function getFilteredEnvelope(filterSpec) {
+    const key = `${filterSpec.type}:${filterSpec.frequency}:${filterSpec.q}`;
+    if (!envelopeCache.has(key)) {
+      const buffer = await renderFilteredMonoBuffer(
+        audioBuffer,
+        filterSpec.type,
+        filterSpec.frequency,
+        filterSpec.q,
+      );
+      envelopeCache.set(key, createEnergyEnvelope(buffer, hopSize));
+    }
+
+    return envelopeCache.get(key);
+  }
+
+  for (const definition of beatTrackDefinitions) {
+    const weightedEnvelopes = [];
+
+    for (const filterSpec of definition.filters) {
+      weightedEnvelopes.push({
+        envelope: await getFilteredEnvelope(filterSpec),
+        weight: filterSpec.weight,
+      });
+    }
+
+    const envelope = combineWeightedEnvelopes(weightedEnvelopes);
+    const bpm = estimateBpmFromEnvelope(envelope, audioBuffer.sampleRate, hopSize);
+    const offset = findBeatOffset(envelope, audioBuffer.sampleRate, hopSize, bpm);
+    results[definition.id] = { bpm, offset };
+  }
+
+  if (decodeContext.close) {
+    await decodeContext.close();
+  }
+
+  return results;
+}
+
 function getBaseBrightness() {
   return Number(backgroundBrightnessInput.value);
 }
@@ -348,6 +593,72 @@ function getVizzySensitivity() {
 
 function getVizzyBandCount() {
   return Number(vizzyBandsInput.value);
+}
+
+function isSkyTitleEnabled() {
+  return skyTitleEnabledInput.checked;
+}
+
+function getSkyTitleText() {
+  return skyTitleTextInput.value.trim() || "Music Wave Visualization With Skyline";
+}
+
+function getSkyTitleBeatEnergy() {
+  const track = beatTracks[skyTitleBeatTrackInput.value] || beatTracks.main;
+  return clamp(track?.pulse || 0, 0, 1);
+}
+
+function getTrackBpm(track) {
+  return Number(track.bpmInput?.value) || 0;
+}
+
+function getTrackOffset(track) {
+  return Number(track.offsetInput?.value) || 0;
+}
+
+function setTrackStatus(track, text) {
+  if (track.statusEl) track.statusEl.textContent = text;
+}
+
+function updateBeatTrack(track, nextBeatInfo) {
+  track.bpm = nextBeatInfo.bpm || 0;
+  track.offset = nextBeatInfo.offset || 0;
+
+  if (track.bpmInput) track.bpmInput.value = track.bpm ? track.bpm.toFixed(1) : "0";
+  if (track.offsetInput) track.offsetInput.value = track.offset ? track.offset.toFixed(2) : "0";
+
+  setTrackStatus(track, track.bpm ? `${track.bpm.toFixed(1)} BPM` : "Not detected");
+}
+
+function getBeatPulseForTrack(track) {
+  const bpm = getTrackBpm(track);
+  if (!bpm || !audio.duration) return 0;
+
+  const interval = 60 / bpm;
+  const elapsed = audio.currentTime - getTrackOffset(track);
+  if (elapsed < 0) return 0;
+
+  const phase = (elapsed % interval) / interval;
+  return Math.exp(-phase * 16);
+}
+
+function updateBeatPulses() {
+  for (const track of Object.values(beatTracks)) {
+    track.pulse = getBeatPulseForTrack(track);
+  }
+}
+
+function getBuildingBeatBoost(buildingName) {
+  const normalizedBuildingName = normalizeBuildingName(buildingName);
+  let boost = 0;
+
+  for (const track of Object.values(beatTracks)) {
+    const targetName = normalizeBuildingName(track.buildingInput?.value);
+    if (!targetName || targetName !== normalizedBuildingName) continue;
+    boost = Math.max(boost, track.pulse);
+  }
+
+  return boost;
 }
 
 function isVizzyMode() {
@@ -478,6 +789,51 @@ function drawClouds(dt) {
   }
 }
 
+function updateSkyTitlePattern(lightness) {
+  for (let hue = 0; hue < 360; hue += 1) {
+    skyTitlePatternCtx.fillStyle = `hsl(${hue} 92% ${lightness}%)`;
+    skyTitlePatternCtx.fillRect(hue * 2, 0, 2, skyTitlePatternCanvas.height);
+  }
+}
+
+function drawSkyTitle(dt) {
+  if (!isSkyTitleEnabled()) return;
+
+  const text = getSkyTitleText();
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const beatEnergy = getSkyTitleBeatEnergy();
+  const speedScale = 1 + beatEnergy * 7;
+  const lightness = clamp(56 + beatEnergy * 10 + flash * 8, 48, 76);
+  const fontSize = clamp(w * 0.052, 28, 78);
+  const y = Math.max(fontSize * 1.55, h * 0.16);
+
+  skyTitleHueOffset = (skyTitleHueOffset + dt * 120 * speedScale) % skyTitlePatternCanvas.width;
+  updateSkyTitlePattern(lightness);
+
+  const pattern = ctx.createPattern(skyTitlePatternCanvas, "repeat");
+  if (!pattern) return;
+
+  ctx.save();
+  ctx.font = `900 ${fontSize}px "Inter", "Segoe UI", Arial, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+
+  const x = w * 0.5;
+  ctx.shadowColor = "rgb(255 255 255 / 0.92)";
+  ctx.shadowBlur = 18 + beatEnergy * 12;
+  ctx.strokeStyle = "rgb(255 255 255 / 0.96)";
+  ctx.lineWidth = Math.max(3, fontSize * 0.08);
+  ctx.strokeText(text, x, y);
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = pattern;
+  ctx.translate(-skyTitleHueOffset, 0);
+  ctx.fillText(text, x + skyTitleHueOffset, y);
+  ctx.restore();
+}
+
 function drawSkyline(energy) {
   if (skylineImage.complete && skylineImage.naturalWidth) {
     drawImageSkyline(energy);
@@ -539,6 +895,9 @@ function getSkylinePlacement() {
 function drawImageBuildingWindows(building, placement, towerEnergy, energy) {
   const rows = Math.max(1, Math.round(toFiniteNumber(building.rows, 6)));
   const cols = Math.max(1, Math.round(toFiniteNumber(building.cols, 3)));
+  const beatBoost = getBuildingBeatBoost(building.name);
+  const isBeatBuilding = beatBoost > 0;
+  const combinedEnergy = Math.max(towerEnergy, beatBoost);
   const topY = building.y - building.height;
   const rect = {
     x: placement.dx + building.x * placement.dw,
@@ -546,7 +905,7 @@ function drawImageBuildingWindows(building, placement, towerEnergy, energy) {
     width: building.width * placement.dw,
     height: building.height * placement.dh,
   };
-  const litRows = Math.round(rows * Math.min(1, towerEnergy * 1.45 + energy.bass * 0.12));
+  const litRows = Math.round(rows * Math.min(1, combinedEnergy * 1.45 + energy.bass * 0.12));
   const padX = Math.max(2, rect.width * 0.12);
   const padY = Math.max(3, rect.height * 0.05);
   const gapX = Math.max(1, rect.width * 0.045);
@@ -555,19 +914,21 @@ function drawImageBuildingWindows(building, placement, towerEnergy, energy) {
   const windowH = Math.max(1.5, (rect.height - padY * 2 - gapY * (rows - 1)) / rows);
 
   ctx.save();
-  ctx.shadowColor = "#ffe6a6";
-  ctx.shadowBlur = 7 + towerEnergy * 12 + flash * 8;
+  ctx.shadowColor = isBeatBuilding ? "#fff1b8" : "#ffe6a6";
+  ctx.shadowBlur = 7 + combinedEnergy * 12 + flash * 8 + beatBoost * 18;
 
   for (let row = 0; row < rows; row += 1) {
     const isLitFloor = row >= rows - litRows;
     for (let col = 0; col < cols; col += 1) {
       const noise = Math.sin(building.seed + row * 4.7 + col * 8.3 + performance.now() * 0.0012);
-      const sparkle = noise > 0.2 || towerEnergy > 0.58;
+      const sparkle = noise > 0.2 || combinedEnergy > 0.58;
       if (!isLitFloor && !sparkle) continue;
 
-      const floorStrength = isLitFloor ? 0.5 + towerEnergy * 0.75 : towerEnergy * 0.2;
-      const alpha = Math.min(0.92, floorStrength + flash * 0.18 + Math.max(0, noise) * 0.14);
-      ctx.fillStyle = `rgb(255 217 143 / ${alpha})`;
+      const floorStrength = isLitFloor ? 0.5 + combinedEnergy * 0.75 : combinedEnergy * 0.2;
+      const alpha = Math.min(0.96, floorStrength + flash * 0.18 + Math.max(0, noise) * 0.14 + beatBoost * 0.25);
+      ctx.fillStyle = isBeatBuilding
+        ? `rgb(255 236 170 / ${alpha})`
+        : `rgb(255 217 143 / ${alpha})`;
       ctx.fillRect(
         rect.x + padX + col * (windowW + gapX),
         rect.y + padY + row * (windowH + gapY),
@@ -809,12 +1170,14 @@ function frame(now) {
   lastTime = now;
 
   const energy = analyzeAudio();
+  updateBeatPulses();
   maybeCreateLightning(energy);
   flash = Math.max(0, flash - dt * 2.7);
 
   drawBackground(energy);
   drawSkyline(energy);
   drawClouds(dt);
+  drawSkyTitle(dt);
   drawLightning(dt);
   drawFlashOverlay();
   if (!isPlaying) drawIdleWave();
@@ -848,8 +1211,10 @@ fileInput.addEventListener("change", () => {
   const file = fileInput.files?.[0];
   if (!file) return;
 
+  selectedAudioFile = file;
   audio.src = URL.createObjectURL(file);
   playButton.disabled = false;
+  detectBeatButton.disabled = false;
   setPlayButtonState(false);
   isPlaying = false;
   requestAnimationFrame(() => playButton.focus());
@@ -873,6 +1238,44 @@ advancedToggle.addEventListener("click", () => {
 analysisModeToggle.addEventListener("click", () => {
   setAnalysisMode(isVizzyMode() ? "classic" : "vizzy");
 });
+
+detectBeatButton.addEventListener("click", async () => {
+  if (!selectedAudioFile) return;
+
+  detectBeatButton.disabled = true;
+  detectBeatButton.textContent = "Detecting...";
+
+  for (const track of Object.values(beatTracks)) {
+    setTrackStatus(track, "Detecting...");
+  }
+
+  try {
+    const detectedTracks = await detectBeatTracksFromFile(selectedAudioFile);
+
+    for (const track of Object.values(beatTracks)) {
+      updateBeatTrack(track, detectedTracks[track.id] || { bpm: 0, offset: 0 });
+    }
+  } catch (error) {
+    console.error(error);
+    for (const track of Object.values(beatTracks)) {
+      setTrackStatus(track, "Detection failed");
+    }
+  } finally {
+    detectBeatButton.textContent = "Detect Beats";
+    detectBeatButton.disabled = false;
+  }
+});
+
+for (const track of Object.values(beatTracks)) {
+  track.bpmInput?.addEventListener("input", () => {
+    track.bpm = getTrackBpm(track);
+    setTrackStatus(track, track.bpm ? `${track.bpm.toFixed(1)} BPM` : "Not detected");
+  });
+
+  track.offsetInput?.addEventListener("input", () => {
+    track.offset = getTrackOffset(track);
+  });
+}
 
 lightningFrequencyInput.addEventListener("input", updateLightningFrequencyLabel);
 

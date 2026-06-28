@@ -174,7 +174,7 @@ button:disabled {
 .advanced-controls {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: auto repeat(6, minmax(112px, 164px)) minmax(220px, auto);
+  grid-template-columns: auto repeat(7, minmax(104px, 156px)) minmax(220px, auto);
   gap: 12px;
   align-items: center;
 }
@@ -221,6 +221,92 @@ legend {
 input[type="range"] {
   width: 100%;
   accent-color: #7dcfff;
+}
+
+input[type="text"],
+input[type="number"],
+select {
+  width: 100%;
+  height: 30px;
+  border: 1px solid rgb(183 211 232 / 24%);
+  border-radius: 6px;
+  padding: 0 8px;
+  background: rgb(8 18 28 / 78%);
+  color: #eff6ff;
+  font: inherit;
+  font-size: 12px;
+}
+
+select {
+  cursor: pointer;
+}
+
+input[type="number"] {
+  appearance: textfield;
+}
+
+.control--checkbox {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 8px;
+  align-items: center;
+}
+
+.control--checkbox > span:first-child {
+  grid-column: 1 / -1;
+}
+
+.control--checkbox > span:last-child {
+  margin: 0;
+  color: #c5d9e9;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.control--checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #7dcfff;
+}
+
+.beat-panel {
+  grid-column: span 4;
+  display: grid;
+  gap: 8px;
+  min-width: 360px;
+}
+
+.beat-panel__header,
+.beat-row {
+  display: grid;
+  grid-template-columns: 72px minmax(110px, 1fr) 72px 72px minmax(74px, auto);
+  gap: 8px;
+  align-items: center;
+}
+
+.beat-panel__header {
+  grid-template-columns: 1fr auto;
+}
+
+.beat-panel__header > span,
+.beat-row__name,
+.beat-row--labels span {
+  color: #92b7d1;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.beat-row--labels {
+  opacity: 0.68;
+}
+
+.beat-row strong {
+  color: #f4fbff;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: right;
 }
 
 fieldset.control {
@@ -294,6 +380,11 @@ input[type="radio"] {
     grid-template-columns: 1fr 1fr;
   }
 
+  .beat-panel {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
   h1 {
     white-space: normal;
   }
@@ -306,6 +397,15 @@ input[type="radio"] {
 
   .advanced-controls {
     grid-template-columns: 1fr;
+  }
+
+  .beat-panel__header,
+  .beat-row {
+    grid-template-columns: 1fr;
+  }
+
+  .beat-row strong {
+    text-align: left;
   }
 
   button,

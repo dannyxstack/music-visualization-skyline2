@@ -97,6 +97,76 @@
             <input id="vizzyBands" type="range" min="24" max="96" value="64" step="8" />
           </label>
 
+          <label class="control control--checkbox">
+            <span>Sky Title</span>
+            <input id="skyTitleEnabled" type="checkbox" checked />
+            <span>Show</span>
+          </label>
+
+          <label class="control">
+            <span>Sky Title Text</span>
+            <input id="skyTitleText" type="text" value="Music Wave Visualization With Skyline" />
+          </label>
+
+          <label class="control">
+            <span>Sky Title Rhythm</span>
+            <select id="skyTitleBeatTrack">
+              <option value="main" selected>Main</option>
+              <option value="kick">Kick</option>
+              <option value="backbeat">Backbeat</option>
+              <option value="hats">Hats</option>
+            </select>
+          </label>
+
+          <section class="beat-panel" aria-label="Beat building mapping">
+            <div class="beat-panel__header">
+              <span>Beat Buildings</span>
+              <button id="detectBeat" class="mode-toggle" type="button" disabled>
+                Detect Beats
+              </button>
+            </div>
+
+            <div class="beat-row beat-row--labels" aria-hidden="true">
+              <span>Track</span>
+              <span>Building</span>
+              <span>BPM</span>
+              <span>Offset</span>
+              <span>Status</span>
+            </div>
+
+            <div class="beat-row" data-beat-track="main">
+              <span class="beat-row__name">Main</span>
+              <input data-role="building" type="text" value="7" placeholder="Building name" aria-label="Main beat building name" />
+              <input data-role="bpm" type="number" min="0" max="240" value="0" step="0.1" aria-label="Main beat BPM" />
+              <input data-role="offset" type="number" min="0" max="10" value="0" step="0.01" aria-label="Main beat offset" />
+              <strong data-role="status">Not detected</strong>
+            </div>
+
+            <div class="beat-row" data-beat-track="kick">
+              <span class="beat-row__name">Kick</span>
+              <input data-role="building" type="text" value="" placeholder="Building name" aria-label="Kick beat building name" />
+              <input data-role="bpm" type="number" min="0" max="240" value="0" step="0.1" aria-label="Kick beat BPM" />
+              <input data-role="offset" type="number" min="0" max="10" value="0" step="0.01" aria-label="Kick beat offset" />
+              <strong data-role="status">Not detected</strong>
+            </div>
+
+            <div class="beat-row" data-beat-track="backbeat">
+              <span class="beat-row__name">Backbeat</span>
+              <input data-role="building" type="text" value="" placeholder="Building name" aria-label="Backbeat building name" />
+              <input data-role="bpm" type="number" min="0" max="240" value="0" step="0.1" aria-label="Backbeat BPM" />
+              <input data-role="offset" type="number" min="0" max="10" value="0" step="0.01" aria-label="Backbeat offset" />
+              <strong data-role="status">Not detected</strong>
+            </div>
+
+            <div class="beat-row" data-beat-track="hats">
+              <span class="beat-row__name">Hats</span>
+              <input data-role="building" type="text" value="" placeholder="Building name" aria-label="Hats building name" />
+              <input data-role="bpm" type="number" min="0" max="240" value="0" step="0.1" aria-label="Hats BPM" />
+              <input data-role="offset" type="number" min="0" max="10" value="0" step="0.01" aria-label="Hats offset" />
+              <strong data-role="status">Not detected</strong>
+            </div>
+          </section>
+
           <fieldset class="control">
             <legend>Lightning Rhythm</legend>
             <label><input type="radio" name="lightningBand" value="treble" checked /> Treble</label>
