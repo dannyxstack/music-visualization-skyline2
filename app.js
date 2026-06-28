@@ -9,10 +9,15 @@ const analysisModeToggle = document.querySelector("#analysisModeToggle");
 const detectBeatButton = document.querySelector("#detectBeat");
 const beatRows = [...document.querySelectorAll("[data-beat-track]")];
 const boostInput = document.querySelector("#lightningBoost");
+const lightningEnabledInput = document.querySelector("#lightningEnabled");
 const lightningFrequencyInput = document.querySelector("#lightningFrequency");
 const lightningFrequencyValue = document.querySelector("#lightningFrequencyValue");
 const backgroundBrightnessInput = document.querySelector("#backgroundBrightness");
-const cloudVisibilityInput = document.querySelector("#cloudVisibility");
+const starsEnabledInput = document.querySelector("#starsEnabled");
+const starCountInput = document.querySelector("#starCount");
+const starCountValue = document.querySelector("#starCountValue");
+const starSpeedInput = document.querySelector("#starSpeed");
+const starSpeedValue = document.querySelector("#starSpeedValue");
 const vizzySensitivityInput = document.querySelector("#vizzySensitivity");
 const vizzyBandsInput = document.querySelector("#vizzyBands");
 const skyTitleEnabledInput = document.querySelector("#skyTitleEnabled");
@@ -36,7 +41,7 @@ let timeData = new Uint8Array(0);
 let isPlaying = false;
 let lightningBand = "treble";
 let buildings = [];
-let clouds = [];
+let stars = [];
 let bolts = [];
 let flash = 0;
 let lastTime = performance.now();
@@ -47,6 +52,8 @@ let vizzyState = createVizzyState(0);
 let selectedAudioFile = null;
 let beatTracks = {};
 let skyTitleHueOffset = 0;
+let pointer = { x: 0, y: 0, active: false };
+let hoveredBuilding = null;
 
 const skylineImage = new Image();
 const skyTitlePatternCanvas = document.createElement("canvas");
@@ -124,21 +131,21 @@ const imageBuildings = [
   { name: "6", x: 0.292, y: 0.810, width: 0.048, height: 0.10, cols: 4, rows: 10 },
   
   // BHP
-  { name: "7", x: 0.348, y: 0.818, width: 0.099, height: 0.34, cols: 8, rows: 16 },
+  { name: "7", x: 0.348, y: 0.818, width: 0.098, height: 0.34, cols: 8, rows: 16 },
   { name: "8", x: 0.442, y: 0.72, width: 0.058, height: 0.232, cols: 5, rows: 24 },
-  { name: "9", x: 0.445, y: 0.833, width: 0.052, height: 0.14, cols: 10, rows: 8 },
+  { name: "9", x: 0.445, y: 0.833, width: 0.052, height: 0.13, cols: 10, rows: 8 },
   
-  { name: "10", x: 0.495, y: 0.825, width: 0.037, height: 0.14, cols: 5, rows: 9 },
+  { name: "10", x: 0.494, y: 0.825, width: 0.037, height: 0.14, cols: 5, rows: 9 },
   { name: "11", x: 0.523, y: 0.820, width: 0.052, height: 0.18, cols: 4, rows: 12 },
   { name: "12", x: 0.570, y: 0.834, width: 0.029, height: 0.14, cols: 4, rows: 10 },
   
   // small pillars
   { name: "13", x: 0.866, y: 0.827, width: 0.020, height: 0.13, cols: 4, rows: 8 },
-  { name: "14", x: 0.639, y: 0.743, width: 0.004, height: 0.28, cols: 1, rows: 18 },
+  { name: "14", x: 0.638, y: 0.743, width: 0.004, height: 0.28, cols: 1, rows: 18 },
   { name: "15", x: 0.437, y: 0.813, width: 0.006, height: 0.34, cols: 1, rows: 16 },
   
   // right sides
-  { name: "16", x: 0.597, y: 0.829, width: 0.048, height: 0.33, cols: 8, rows: 20 },
+  { name: "16", x: 0.596, y: 0.829, width: 0.048, height: 0.33, cols: 8, rows: 20 },
   { name: "17", x: 0.632, y: 0.832, width: 0.053, height: 0.13, cols: 5, rows: 6 },
   { name: "18", x: 0.639, y: 0.826, width: 0.065, height: 0.17, cols: 6, rows: 18 },
   { name: "19", x: 0.711, y: 0.826, width: 0.060, height: 0.22, cols: 5, rows: 20 },
@@ -147,14 +154,15 @@ const imageBuildings = [
   // no use
   { name: "21", x: 0.777, y: 0.827, width: 0.01, height: 0.01, cols: 1, rows: 1 },
   { name: "22", x: 0.777, y: 0.827, width: 0.01, height: 0.01, cols: 1, rows: 1 },
-  { name: "23", x: 0.842, y: 0.831, width: 0.024, height: 0.21, cols: 3, rows: 13 },
+  { name: "23", x: 0.842, y: 0.831, width: 0.024, height: 0.24, cols: 3, rows: 21 },
 ];
 
 skylineImage.addEventListener("load", () => {
   buildSkyline();
+  buildStars();
 });
 
-skylineImage.src = "city-skyline.gpt.png";
+skylineImage.src = "city-skyline.gpt.16x10v2.png";
 
 function setupAudio() {
   if (audioContext) return;
@@ -178,7 +186,7 @@ function resize() {
   canvas.height = Math.floor(window.innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   buildSkyline();
-  buildClouds();
+  buildStars();
 }
 
 function randomRange(min, max) {
@@ -196,6 +204,17 @@ function clamp(value, min, max) {
 
 function normalizeBuildingName(name) {
   return String(name ?? "").trim().toLowerCase();
+}
+
+function getImageBuildingRect(building, placement = getSkylinePlacement()) {
+  const topY = building.y - building.height;
+
+  return {
+    x: placement.dx + building.x * placement.dw,
+    y: placement.dy + topY * placement.dh,
+    width: building.width * placement.dw,
+    height: building.height * placement.dh,
+  };
 }
 
 function normalizeImageBuilding(building, index) {
@@ -259,17 +278,57 @@ function buildSkyline() {
   }
 }
 
-function buildClouds() {
-  const w = window.innerWidth;
+function getStarSkyBounds() {
   const h = window.innerHeight;
-  clouds = Array.from({ length: Math.max(7, Math.floor(w / 180)) }, () => ({
-    x: randomRange(-w * 0.25, w),
-    y: randomRange(16, h * 0.36),
-    width: randomRange(160, 360),
-    height: randomRange(28, 76),
-    speed: randomRange(3, 12),
-    alpha: randomRange(0.22, 0.58),
-  }));
+
+  if (skylineImage.complete && skylineImage.naturalWidth) {
+    const placement = getSkylinePlacement();
+
+    return {
+      top: clamp(placement.dy + placement.dh * 0.04, 8, h * 0.24),
+      bottom: clamp(placement.dy + placement.dh * 0.55, h * 0.24, h * 0.62),
+    };
+  }
+
+  return {
+    top: 8,
+    bottom: h * 0.55,
+  };
+}
+
+function createStar(x = randomRange(-window.innerWidth * 0.08, window.innerWidth * 1.08)) {
+  const bounds = getStarSkyBounds();
+  const depth = randomRange(0.35, 1);
+  const colors = [
+    { r: 246, g: 248, b: 255 },
+    { r: 255, g: 183, b: 226 },
+    { r: 232, g: 190, b: 255 },
+    { r: 255, g: 214, b: 138 },
+    { r: 255, g: 156, b: 198 },
+    { r: 213, g: 178, b: 255 },
+  ];
+  const twinkles = Math.random() < 0.5;
+  const tinted = Math.random() < 0.5;
+  const color = tinted ? colors[Math.floor(randomRange(1, colors.length))] : colors[0];
+
+  return {
+    x,
+    y: randomRange(bounds.top, bounds.bottom),
+    radius: randomRange(0.45, 1.55) + depth * 0.85,
+    color,
+    tinted,
+    twinkles,
+    depth,
+    speed: randomRange(0.09, 1.05) * depth,
+    phase: randomRange(0, Math.PI * 2),
+    twinkleSpeed: randomRange(0.55, 1.8),
+    alpha: randomRange(0.42, 0.92),
+  };
+}
+
+function buildStars() {
+  const count = getStarCount();
+  stars = Array.from({ length: count }, () => createStar());
 }
 
 function getEnergy(startHz, endHz) {
@@ -574,8 +633,37 @@ function getBaseBrightness() {
   return Number(backgroundBrightnessInput.value);
 }
 
-function getCloudVisibility() {
-  return Number(cloudVisibilityInput.value);
+function isLightningEnabled() {
+  return lightningEnabledInput.checked;
+}
+
+function isStarsEnabled() {
+  return starsEnabledInput.checked;
+}
+
+function getStarCount() {
+  return Math.max(0, Math.round(Number(starCountInput.value) || 0));
+}
+
+function getStarSpeed() {
+  return Number(starSpeedInput.value) || 0;
+}
+
+function updateStarControlLabels() {
+  starCountValue.textContent = String(getStarCount());
+  starSpeedValue.textContent = `${getStarSpeed().toFixed(1)}x`;
+}
+
+function syncStarCount() {
+  const count = getStarCount();
+
+  while (stars.length < count) {
+    stars.push(createStar());
+  }
+
+  if (stars.length > count) {
+    stars.length = count;
+  }
 }
 
 function getLightningFrequencyMultiplier() {
@@ -740,53 +828,64 @@ function drawBackground(energy) {
   ctx.globalAlpha = 1;
 }
 
-function drawClouds(dt) {
+function drawStars(dt) {
+  if (!isStarsEnabled()) return;
+
   const w = window.innerWidth;
-  const visibility = getCloudVisibility();
+  const bounds = getStarSkyBounds();
+  const speed = getStarSpeed();
+  const now = performance.now() * 0.001;
 
-  if (visibility <= 0) {
-    return;
-  }
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
 
-  for (const cloud of clouds) {
-    cloud.x += cloud.speed * dt;
-    if (cloud.x > w + cloud.width) cloud.x = -cloud.width * 1.2;
+  for (const star of stars) {
+    star.x += star.speed * speed * dt * 8;
 
-    const gradient = ctx.createRadialGradient(
-      cloud.x + cloud.width * 0.5,
-      cloud.y,
-      10,
-      cloud.x + cloud.width * 0.5,
-      cloud.y,
-      cloud.width * 0.6,
-    );
-    const alpha = Math.min(0.9, (cloud.alpha + flash * 0.25) * visibility);
-    gradient.addColorStop(0, `rgb(128 145 158 / ${alpha})`);
-    gradient.addColorStop(1, "rgb(28 39 50 / 0)");
+    if (star.x > w + star.radius * 8) {
+      Object.assign(star, createStar(-randomRange(12, w * 0.08)));
+    }
 
-    ctx.fillStyle = gradient;
+    if (star.y < bounds.top || star.y > bounds.bottom) {
+      star.y = randomRange(bounds.top, bounds.bottom);
+    }
+
+    const wave = star.twinkles ? 0.5 + Math.sin(now * star.twinkleSpeed + star.phase) * 0.5 : 0.45;
+    const rareSpark = star.twinkles
+      ? Math.max(0, Math.sin(now * 0.27 + star.phase * 3.1) - 0.96) * 7
+      : 0;
+    const flashWash = clamp(1 - flash * 0.68, 0.18, 1);
+    const alpha = clamp(star.alpha * (0.58 + wave * 0.34 + rareSpark) * flashWash, 0.06, 1);
+    const radius = star.radius * (0.86 + wave * 0.18);
+    const litColor = {
+      r: Math.min(255, star.color.r + flash * 18),
+      g: Math.min(255, star.color.g + flash * 18),
+      b: Math.min(255, star.color.b + flash * 14),
+    };
+
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = `rgb(${litColor.r} ${litColor.g} ${litColor.b})`;
     ctx.beginPath();
-    ctx.ellipse(cloud.x, cloud.y, cloud.width * 0.45, cloud.height * 0.52, 0, 0, Math.PI * 2);
-    ctx.ellipse(
-      cloud.x + cloud.width * 0.34,
-      cloud.y - cloud.height * 0.1,
-      cloud.width * 0.38,
-      cloud.height * 0.58,
-      0,
-      0,
-      Math.PI * 2,
-    );
-    ctx.ellipse(
-      cloud.x + cloud.width * 0.68,
-      cloud.y + cloud.height * 0.06,
-      cloud.width * 0.46,
-      cloud.height * 0.5,
-      0,
-      0,
-      Math.PI * 2,
-    );
+    ctx.arc(star.x, star.y, radius, 0, Math.PI * 2);
     ctx.fill();
+
+    if (star.twinkles && star.depth > 0.72 && alpha > 0.72) {
+      ctx.globalAlpha = alpha * (0.34 + rareSpark * 0.24);
+      ctx.shadowColor = `rgb(${litColor.r} ${litColor.g} ${litColor.b})`;
+      ctx.shadowBlur = 5 + rareSpark * 8 + flash * 6;
+      ctx.strokeStyle = `rgb(${litColor.r} ${litColor.g} ${litColor.b})`;
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(star.x - radius * 2.4, star.y);
+      ctx.lineTo(star.x + radius * 2.4, star.y);
+      ctx.moveTo(star.x, star.y - radius * 2.4);
+      ctx.lineTo(star.x, star.y + radius * 2.4);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
   }
+
+  ctx.restore();
 }
 
 function updateSkyTitlePattern(lightness) {
@@ -892,19 +991,97 @@ function getSkylinePlacement() {
   };
 }
 
+function findHoveredImageBuilding(x, y) {
+  if (!skylineImage.complete || !skylineImage.naturalWidth) return null;
+
+  const placement = getSkylinePlacement();
+
+  for (let i = buildings.length - 1; i >= 0; i -= 1) {
+    const building = buildings[i];
+    if (building.source !== "image") continue;
+
+    const rect = getImageBuildingRect(building, placement);
+    const isInside = x >= rect.x
+      && x <= rect.x + rect.width
+      && y >= rect.y
+      && y <= rect.y + rect.height;
+
+    if (isInside) {
+      return { building, rect };
+    }
+  }
+
+  return null;
+}
+
+function updateHoveredBuilding() {
+  if (isPlaying) {
+    hoveredBuilding = null;
+    canvas.style.cursor = "default";
+    return;
+  }
+
+  hoveredBuilding = pointer.active ? findHoveredImageBuilding(pointer.x, pointer.y) : null;
+  canvas.style.cursor = hoveredBuilding ? "help" : "default";
+}
+
+function drawBuildingTooltip() {
+  if (!hoveredBuilding) return;
+
+  const name = String(hoveredBuilding.building.name || "").trim();
+  if (!name) return;
+
+  const paddingX = 10;
+  const paddingY = 7;
+  const fontSize = 13;
+
+  ctx.save();
+  ctx.font = `800 ${fontSize}px "Inter", "Segoe UI", Arial, sans-serif`;
+  const metrics = ctx.measureText(name);
+  const boxW = Math.ceil(metrics.width + paddingX * 2);
+  const boxH = fontSize + paddingY * 2;
+  let x = pointer.x + 14;
+  let y = pointer.y - boxH - 12;
+
+  if (x + boxW > window.innerWidth - 8) x = pointer.x - boxW - 14;
+  if (y < 8) y = pointer.y + 16;
+
+  ctx.strokeStyle = "rgb(255 255 255 / 0.72)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]);
+  ctx.strokeRect(
+    hoveredBuilding.rect.x,
+    hoveredBuilding.rect.y,
+    hoveredBuilding.rect.width,
+    hoveredBuilding.rect.height,
+  );
+  ctx.setLineDash([]);
+
+  ctx.shadowColor = "rgb(0 0 0 / 0.55)";
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = "rgb(7 15 24 / 0.86)";
+  ctx.strokeStyle = "rgb(255 255 255 / 0.78)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y, boxW, boxH, 7);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(name, x + paddingX, y + boxH * 0.5);
+  ctx.restore();
+}
+
 function drawImageBuildingWindows(building, placement, towerEnergy, energy) {
   const rows = Math.max(1, Math.round(toFiniteNumber(building.rows, 6)));
   const cols = Math.max(1, Math.round(toFiniteNumber(building.cols, 3)));
   const beatBoost = getBuildingBeatBoost(building.name);
   const isBeatBuilding = beatBoost > 0;
   const combinedEnergy = Math.max(towerEnergy, beatBoost);
-  const topY = building.y - building.height;
-  const rect = {
-    x: placement.dx + building.x * placement.dw,
-    y: placement.dy + topY * placement.dh,
-    width: building.width * placement.dw,
-    height: building.height * placement.dh,
-  };
+  const rect = getImageBuildingRect(building, placement);
   const litRows = Math.round(rows * Math.min(1, combinedEnergy * 1.45 + energy.bass * 0.12));
   const padX = Math.max(2, rect.width * 0.12);
   const padY = Math.max(3, rect.height * 0.05);
@@ -1044,6 +1221,11 @@ function drawWindows(building, topY, height, towerEnergy, energy) {
 }
 
 function maybeCreateLightning(energy) {
+  if (!isLightningEnabled()) {
+    previousBandEnergy = 0;
+    return;
+  }
+
   const frequencyMultiplier = getLightningFrequencyMultiplier();
   const onset = energy.onset?.[lightningBand] || 0;
   const chosen = isVizzyMode() ? clamp(onset * 0.9 + energy[lightningBand] * 0.18, 0, 1) : energy[lightningBand];
@@ -1104,6 +1286,11 @@ function makeBolt(power) {
 }
 
 function drawLightning(dt) {
+  if (!isLightningEnabled()) {
+    bolts = [];
+    return;
+  }
+
   const boost = Number(boostInput.value);
 
   for (const bolt of bolts) {
@@ -1139,7 +1326,7 @@ function drawBoltPath(points, width, strokeStyle) {
 }
 
 function drawFlashOverlay() {
-  if (flash <= 0.01) return;
+  if (!isLightningEnabled() || flash <= 0.01) return;
 
   const boost = Number(boostInput.value);
   ctx.fillStyle = `rgb(205 230 248 / ${Math.min(0.48, flash * 0.2 * boost)})`;
@@ -1171,16 +1358,18 @@ function frame(now) {
 
   const energy = analyzeAudio();
   updateBeatPulses();
+  updateHoveredBuilding();
   maybeCreateLightning(energy);
-  flash = Math.max(0, flash - dt * 2.7);
+  flash = isLightningEnabled() ? Math.max(0, flash - dt * 2.7) : 0;
 
   drawBackground(energy);
   drawSkyline(energy);
-  drawClouds(dt);
+  drawStars(dt);
   drawSkyTitle(dt);
   drawLightning(dt);
   drawFlashOverlay();
   if (!isPlaying) drawIdleWave();
+  drawBuildingTooltip();
 
   requestAnimationFrame(frame);
 }
@@ -1194,6 +1383,8 @@ async function togglePlayback() {
   if (audio.paused) {
     await audio.play();
     isPlaying = true;
+    hoveredBuilding = null;
+    canvas.style.cursor = "default";
     setPlayButtonState(true);
   } else {
     audio.pause();
@@ -1279,6 +1470,21 @@ for (const track of Object.values(beatTracks)) {
 
 lightningFrequencyInput.addEventListener("input", updateLightningFrequencyLabel);
 
+lightningEnabledInput.addEventListener("change", () => {
+  if (isLightningEnabled()) return;
+
+  bolts = [];
+  flash = 0;
+  previousBandEnergy = 0;
+});
+
+starCountInput.addEventListener("input", () => {
+  updateStarControlLabels();
+  syncStarCount();
+});
+
+starSpeedInput.addEventListener("input", updateStarControlLabels);
+
 vizzyBandsInput.addEventListener("input", () => {
   vizzyState = createVizzyState(0);
 });
@@ -1288,6 +1494,22 @@ window.addEventListener("keydown", (event) => {
 
   event.preventDefault();
   togglePlayback();
+});
+
+canvas.addEventListener("pointermove", (event) => {
+  const rect = canvas.getBoundingClientRect();
+  pointer = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+    active: true,
+  };
+  updateHoveredBuilding();
+});
+
+canvas.addEventListener("pointerleave", () => {
+  pointer.active = false;
+  hoveredBuilding = null;
+  canvas.style.cursor = "default";
 });
 
 audio.addEventListener("ended", () => {
@@ -1304,6 +1526,7 @@ for (const input of bandInputs) {
 
 window.addEventListener("resize", resize);
 updateLightningFrequencyLabel();
+updateStarControlLabels();
 setAnalysisMode("classic");
 setAdvancedCollapsed(false);
 resize();

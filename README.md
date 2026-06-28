@@ -1,19 +1,21 @@
 # Music Wave Vision Under Thunder
 
-A browser-based music visualizer that maps audio energy onto a city skyline. Building windows light up like spectrum bars, clouds drift across the sky, and lightning flashes in response to the selected rhythm band.
+A browser-based music visualizer that maps audio energy onto a city skyline. Building windows light up like spectrum bars, stars move slowly through the night, and lightning flashes in response to the selected rhythm band.
 
 ## Features
 
 - Local audio file playback through the Web Audio API.
-- Canvas-rendered skyline, clouds, lightning, water glow, and idle waveform.
+- Canvas-rendered skyline, colored stars, lightning, water glow, and idle waveform.
 - City image backdrop with configurable building window regions.
+- Building hover labels based on the configured `imageBuildings` rectangles.
 - Bass, Mid, and Treble meters.
 - Two audio analysis modes:
   - `Classic`: simple Bass/Mid/Treble frequency bands.
   - `Vizzy-like`: log-spaced multi-band analysis with spectral-flux style hit detection.
-- Adjustable lightning brightness and frequency.
+- Adjustable lightning visibility, brightness, and frequency.
+- Adjustable star visibility, count, and movement speed.
 - Offline beat detection for a named building.
-- Adjustable background brightness and cloud visibility.
+- Adjustable background brightness.
 - Selectable lightning rhythm source: Bass, Mid, or Treble.
 - Collapsible advanced settings panel.
 - Spacebar playback toggle after an audio file is selected.
@@ -46,9 +48,12 @@ You can also open `index.html` directly, but using a local server is more reliab
 
 - `Classic / Vizzy-like`: switches between the original simple frequency mode and the more transient-aware mode.
 - `Lightning Brightness`: controls bolt glow and flash intensity.
+- `Lightning`: shows or hides lightning. When disabled, no bolts or flash overlay are drawn.
 - `Lightning Frequency`: controls how often lightning appears. The center is `1x`; each step left halves the frequency, and each step right doubles it.
 - `Base Background Brightness`: controls the non-lightning brightness of the skyline and sky.
-- `Cloud Visibility`: fades clouds from hidden to visible.
+- `Stars`: shows or hides the moving star field.
+- `Star Count`: controls how many stars are drawn.
+- `Star Speed`: controls the very slow left-to-right star movement. All stars move with a wide speed spread, 50% twinkle, and 50% use pink, purple, or warm yellow nebula tones.
 - `Vizzy Sensitivity`: controls how strongly Vizzy-like mode responds to sudden audio changes.
 - `Vizzy Bands`: controls the number of log-spaced analysis bands used by Vizzy-like mode.
 - `Sky Title`: shows or hides the animated title in the sky.
@@ -89,9 +94,13 @@ The sky title is drawn on the canvas, above the skyline. Its white stroke and sh
 
 The fill pattern moves from right to left. Its speed is scaled from `1` to `8` by the selected beat track pulse, and its brightness changes subtly with the same pulse.
 
+## Star Performance
+
+Stars are drawn as lightweight colored points. Only the twinkling foreground stars receive a small glow or cross flare, because applying canvas shadow blur to every star each frame is expensive and can cause stutter. Building hover labels are disabled during playback to avoid per-frame hit testing while music is running.
+
 ## City Building Mapping
 
-The city image is drawn from `city-skyline.png` by default. The `imageBuildings` array in `app.js` defines where building windows should be drawn.
+The city image is drawn from `city-skyline.gpt.png` by default. The `imageBuildings` array in `app.js` defines where building windows should be drawn.
 
 Each object uses image-relative coordinates:
 
@@ -123,6 +132,8 @@ You can replace numeric names with your own labels, for example:
 
 Then enter `BHP` in one of the `Beat Buildings` name fields and click `Detect Beats`.
 
+Moving the pointer over a configured building rectangle while playback is stopped shows that building's `name`. This hover label uses the `imageBuildings` render region, not image recognition, and is disabled during playback for performance.
+
 ## Beat Detection
 
 The beat detector runs after an audio file is selected and `Detect Beats` is clicked. It:
@@ -144,8 +155,8 @@ The detected BPM and offset can be manually adjusted per track. A track only ren
 
 - `index.html`: page structure and controls.
 - `styles.css`: layout, controls, responsive behavior, and icon styling.
-- `app.js`: audio analysis, animation, skyline mapping, lightning, clouds, and playback.
-- `city-skyline.png`: default city skyline image.
+- `app.js`: audio analysis, animation, skyline mapping, stars, lightning, and playback.
+- `city-skyline.gpt.png`: default city skyline image.
 - `rules.md`: UI maintenance rules for the collapsible controls.
 
 ## UI Rules
