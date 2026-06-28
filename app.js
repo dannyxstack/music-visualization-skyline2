@@ -123,38 +123,42 @@ function createVizzyState(bandCount) {
 
 // x,y are the building rectangle's bottom-left coordinates in image-relative units.
 const imageBuildings = [
-  { name: "1", x: 0.04, y: 0.820, width: 0.025, height: 0.23, cols: 5, rows: 10 },
-  { name: "2", x: 0.057, y: 0.820, width: 0.05, height: 0.23, cols: 5, rows: 10 },
-  { name: "3", x: 0.105, y: 0.815, width: 0.073, height: 0.161, cols: 6, rows: 18 },
-  { name: "4", x: 0.175, y: 0.812, width: 0.055, height: 0.13, cols: 4, rows: 16 },
-  { name: "5", x: 0.221, y: 0.810, width: 0.070, height: 0.10, cols: 3, rows: 16 },
-  { name: "6", x: 0.292, y: 0.810, width: 0.048, height: 0.10, cols: 4, rows: 10 },
+  { name: "1", x: 0.044, y: 0.800, width: 0.028, height: 0.245, cols: 5, rows: 10 },
+  { name: "2", x: 0.063, y: 0.800, width: 0.056, height: 0.245, cols: 5, rows: 10 },
+  { name: "3", x: 0.115, y: 0.795, width: 0.081, height: 0.17, cols: 6, rows: 18 },
+  { name: "4", x: 0.194, y: 0.791, width: 0.058, height: 0.15, cols: 4, rows: 16 },
+  { name: "5", x: 0.245, y: 0.788, width: 0.078, height: 0.10, cols: 3, rows: 16 },
+  { name: "6", x: 0.324, y: 0.788, width: 0.053, height: 0.113, cols: 4, rows: 10 },
+  
+  { name: "6r", x: 0.379, y: 0.734, width: 0.022, height: 0.033, cols: 2, rows: 3 },
   
   // BHP
-  { name: "7", x: 0.348, y: 0.818, width: 0.098, height: 0.34, cols: 8, rows: 16 },
-  { name: "8", x: 0.442, y: 0.72, width: 0.058, height: 0.232, cols: 5, rows: 24 },
-  { name: "9", x: 0.445, y: 0.833, width: 0.052, height: 0.13, cols: 10, rows: 8 },
+  { name: "7", x: 0.386, y: 0.795, width: 0.107, height: 0.343, cols: 8, rows: 16 },
+  { name: "8", x: 0.491, y: 0.700, width: 0.064, height: 0.232, cols: 5, rows: 24 },
+  { name: "9", x: 0.494, y: 0.813, width: 0.058, height: 0.13, cols: 10, rows: 8 },
   
-  { name: "10", x: 0.494, y: 0.825, width: 0.037, height: 0.14, cols: 5, rows: 9 },
-  { name: "11", x: 0.523, y: 0.820, width: 0.052, height: 0.18, cols: 4, rows: 12 },
-  { name: "12", x: 0.570, y: 0.834, width: 0.029, height: 0.14, cols: 4, rows: 10 },
+  { name: "10", x: 0.546, y: 0.805, width: 0.041, height: 0.14, cols: 5, rows: 9 },
+  { name: "11", x: 0.579, y: 0.800, width: 0.058, height: 0.198, cols: 4, rows: 17 },
+  { name: "12", x: 0.632, y: 0.814, width: 0.033, height: 0.14, cols: 4, rows: 10 },
   
   // small pillars
-  { name: "13", x: 0.866, y: 0.827, width: 0.020, height: 0.13, cols: 4, rows: 8 },
-  { name: "14", x: 0.638, y: 0.743, width: 0.004, height: 0.28, cols: 1, rows: 18 },
-  { name: "15", x: 0.437, y: 0.813, width: 0.006, height: 0.34, cols: 1, rows: 16 },
+  { name: "13", x: 0.961, y: 0.811, width: 0.022, height: 0.125, cols: 4, rows: 8 },
+  { name: "14", x: 0.708, y: 0.724, width: 0.004, height: 0.28, cols: 1, rows: 18 },
+  { name: "15", x: 0.485, y: 0.792, width: 0.006, height: 0.34, cols: 1, rows: 16 },
   
   // right sides
-  { name: "16", x: 0.596, y: 0.829, width: 0.048, height: 0.33, cols: 8, rows: 20 },
-  { name: "17", x: 0.632, y: 0.832, width: 0.053, height: 0.13, cols: 5, rows: 6 },
-  { name: "18", x: 0.639, y: 0.826, width: 0.065, height: 0.17, cols: 6, rows: 18 },
-  { name: "19", x: 0.711, y: 0.826, width: 0.060, height: 0.22, cols: 5, rows: 20 },
-  { name: "20", x: 0.779, y: 0.827, width: 0.070, height: 0.23, cols: 6, rows: 15 },
+  { name: "16", x: 0.662, y: 0.809, width: 0.053, height: 0.31, cols: 8, rows: 20 },
+  { name: "17", x: 0.702, y: 0.811, width: 0.059, height: 0.10, cols: 5, rows: 6 },
+  { name: "18", x: 0.709, y: 0.806, width: 0.072, height: 0.17, cols: 6, rows: 18 },
+  { name: "19l", x: 0.781, y: 0.804, width: 0.028, height: 0.05, cols: 2, rows: 6 },
+  { name: "19", x: 0.789, y: 0.806, width: 0.066, height: 0.235, cols: 5, rows: 20 },
+  { name: "19r", x: 0.836, y: 0.804, width: 0.033, height: 0.05, cols: 3, rows: 6 },
+  { name: "20", x: 0.865, y: 0.807, width: 0.078, height: 0.24, cols: 6, rows: 15 },
 
   // no use
-  { name: "21", x: 0.777, y: 0.827, width: 0.01, height: 0.01, cols: 1, rows: 1 },
-  { name: "22", x: 0.777, y: 0.827, width: 0.01, height: 0.01, cols: 1, rows: 1 },
-  { name: "23", x: 0.842, y: 0.831, width: 0.024, height: 0.24, cols: 3, rows: 21 },
+  { name: "21", x: 0.863, y: 0.807, width: 0.011, height: 0.01, cols: 1, rows: 1 },
+  { name: "22", x: 0.863, y: 0.807, width: 0.011, height: 0.01, cols: 1, rows: 1 },
+  { name: "23", x: 0.935, y: 0.812, width: 0.027, height: 0.24, cols: 3, rows: 21 },
 ];
 
 skylineImage.addEventListener("load", () => {
